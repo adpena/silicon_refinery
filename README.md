@@ -81,20 +81,22 @@ record = await parse_doctor_notes("Severe migraines and nausea for 4 days. ER im
 print(record.suggested_triage) # -> "HIGH"
 ```
 
-### 2. Configurable Async Streams (`stream_extract`)
-Process gigabytes of data lazily using asynchronous generators. This function includes built-in line-level chunking (`lines_per_chunk`) and advanced context window management (`history_mode`). 
+### 2. Concurrent Async Streams (`stream_extract`)
+Process gigabytes of data lazily using asynchronous generators. This function includes built-in line-level chunking (`lines_per_chunk`), advanced context window management (`history_mode`), and native **concurrency**.
 
 ```python
 from silicon_refinery import stream_extract
 
-# history_mode='clear' (default) avoids memory leaks on infinite streams.
-# 'compact' will automatically ask the LLM to summarize previous context!
+# concurrency > 1 automatically spawns parallel tasks and yields 
+# structured objects out-of-order, similar to `imap_unordered`!
+# 'compact' history_mode asks the LLM to summarize previous context to prevent overflow.
 async for enriched in stream_extract(
     review_stream, 
     schema=Feedback, 
     instructions="Analyze sentiment.", 
     lines_per_chunk=5,
     history_mode='clear',
+    concurrency=4, 
     debug_timing=True
 ):
     await db.insert(enriched)
@@ -185,9 +187,9 @@ During our payload escalation test, the local foundation model flawlessly proces
 
 ## 🔮 Future Work: The Pythonic Frontier
 
-While `SiliconRefinery` is built with robust typing, dataclasses, and standard async generators, there is more magic to unlock as the Python ecosystem evolves:
-- **Free-Threading & Subinterpreters (PEP 703/684):** Python 3.13+ introduced experimental features that bypass the GIL. We aim to test whether multiple Apple FM SDK sessions can run truly concurrently on separate M-series cores.
-- **JIT Compilation (PEP 744):** The new copy-and-patch JIT in Python could potentially reduce overhead during massive Polars/Pandas map-batch conversions.
+While `SiliconRefinery` is built with robust typing, dataclasses, generic `TypeVar` extractors, and concurrent async generators, there is more magic to unlock as the Python ecosystem evolves:
+- **Free-Threading & Subinterpreters (PEP 703/684):** Python 3.13+ introduces experimental features that bypass the GIL. `SiliconRefinery`'s `stream_extract(concurrency=X)` implementation is architected to natively exploit the `python3.13t` free-threaded interpreter, potentially allowing parallel Foundation Model C-extensions to run truly concurrently on separate M-series cores without Python-level locking.
+- **JIT Compilation (PEP 744):** The new copy-and-patch JIT in Python (enabled via `PYTHON_JIT=1`) can drastically reduce overhead during massive Polars/Pandas map-batch conversions or when managing thousands of asynchronous tasks.
 
 ---
 
