@@ -5,6 +5,20 @@ All notable changes to SiliconRefinery will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions increment by patch (0.0.205 → 0.0.206 → 0.0.207 → 0.0.208 ...).
 
+## [0.0.217] - 2026-02-26
+
+Final Toga chat layout and transcript UX hardening for release.
+
+### Changed
+- Sidebar layout now uses a fixed-width, height-responsive frame that stays top-aligned with the status area and bottom-aligned with the transcript frame boundary across window resize events.
+- Main pane layout now allocates extra width/height proportionally to non-sidebar content (status/transcript/compose region) while preserving a stable sidebar width.
+- Transcript rendering now auto-scrolls to newest content with throttled/coalesced scheduling to remain responsive during high-frequency streaming updates.
+
+### Validation
+- `uv run --project examples/toga_local_chat_app --directory examples/toga_local_chat_app ruff check src/silicon_refinery_chat/app.py`
+- Startup smoke: `uv run silicon-refinery chat --python` (process stayed alive for 10s, then cleanly terminated)
+- Async autoscroll stress probe: 120 rapid transcript updates coalesced into 6 scroll calls
+
 ## [0.0.208] - 2026-02-26
 
 Release and distribution hardening across GitHub, PyPI, and Homebrew.
