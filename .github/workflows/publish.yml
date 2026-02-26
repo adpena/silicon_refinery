@@ -88,7 +88,8 @@ jobs:
       - name: Create and push version tag
         run: |
           TAG="v${{ steps.version.outputs.version }}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
+          git fetch --tags --force
+          if git ls-remote --tags origin "${TAG}" | grep -q "refs/tags/${TAG}$"; then
             echo "Tag $TAG already exists, skipping."
           else
             git tag "$TAG"
