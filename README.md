@@ -1,6 +1,6 @@
 <div align="center">
   <h1>SiliconRefinery</h1>
-  <p><b>A Zero-Trust, Zero-Latency, Zero-Cost ETL Framework for Apple Silicon</b></p>
+  <p><b>Local Python framework for structured extraction on Apple Silicon</b></p>
   <p>
     <a href="https://pypi.org/project/silicon-refinery/"><img src="https://img.shields.io/pypi/v/silicon_refinery.svg" alt="PyPI Version"></a>
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
@@ -10,12 +10,51 @@
   </p>
 </div>
 
-**SiliconRefinery** is a Python framework built on the [Apple Foundation Models SDK (`python-apple-fm-sdk`)](https://github.com/apple/python-apple-fm-sdk). It transforms your Apple Silicon machine into a private, high-throughput data extraction node — processing unstructured text into guaranteed-schema objects without ever sending a single byte to the cloud.
+**SiliconRefinery** is a Python framework built on the [Apple Foundation Models SDK (`python-apple-fm-sdk`)](https://github.com/apple/python-apple-fm-sdk). It provides local APIs and tools for converting unstructured text into schema-validated Python objects on Apple Silicon.
 
-It is designed for both large-scale teams and individual local developers:
-- building privacy-preserving data workflows on macOS
-- prototyping and shipping local-first Mac applications
-- integrating on-device AI into development tooling and product features
+It is a developer layer for the SDK: app, CLI, and API surfaces that reduce the amount of wrapper and runtime plumbing developers need to build themselves.
+
+Built so far (applications + APIs):
+- `SiliconRefineryChat` (macOS app): a local-first chat app with streaming responses, SQLite-backed multi-chat history, export/resume flows, and no cloud dependency; also serves as a reference implementation for SDK-driven chat UX patterns.
+- `silicon-refinery chat` (CLI app): a scriptable local chat runtime for terminal-first workflows and fast iteration during development.
+- `@local_extract` (core API): schema-guaranteed extraction from unstructured text into typed Python objects, without prompt-parsing hacks.
+- `stream_extract` (core API): async streaming extraction for high-throughput pipelines where latency and concurrency both matter.
+- `Source >> Extract >> Sink` (pipeline API): composable, readable dataflow pattern for production ETL and event-processing jobs.
+- `@enhanced_debug` (diagnostics API): model-assisted debugging summaries that stay local, with controllable output routing for prompt and summary traces.
+- `Polars .local_llm.extract()` (DataFrame API): direct structured extraction on tabular data without leaving the Polars workflow.
+- `AppleFMLM` for DSPy and FastAPI integration examples: practical adapters for integrating on-device inference into agent and service architectures.
+
+Quick capability snippets:
+
+```bash
+# Local desktop chat (Apple Foundation Models + SQLite memory)
+silicon-refinery chat
+
+# Standalone app entrypoint after Homebrew cask install
+silicon-refinery-chat
+```
+
+```python
+# Polars-native structured extraction on-device
+import polars as pl
+from silicon_refinery.polars_ext import LocalLLMExpr  # registers .local_llm
+
+enriched_df = df.with_columns(
+    extracted_json=pl.col("text_column").local_llm.extract(
+        schema=YourSchema,
+        instructions="Extract only fields required by the schema.",
+    )
+)
+```
+
+```python
+# Local AI crash analysis with explicit output routing
+from silicon_refinery import enhanced_debug
+
+@enhanced_debug(summary_to="stderr", prompt_to="stdout", silenced=False)
+def process_data(payload):
+    return payload["value"] + 10
+```
 
 ```python
 from silicon_refinery import local_extract
@@ -28,7 +67,7 @@ ticket = await classify("I was charged twice and I need a refund!")
 # -> SupportTicket(category="Billing", urgency="HIGH", summary="Duplicate charge refund request")
 ```
 
-No API keys. No cloud calls. No token costs. Everything runs on the Neural Engine.
+No API keys or cloud calls are required for local inference.
 
 ---
 
@@ -52,16 +91,16 @@ No API keys. No cloud calls. No token costs. Everything runs on the Neural Engin
 - [Architecture & Design Decisions](#architecture--design-decisions)
 - [Future Work](#future-work)
 - [Contributing](#contributing)
-- [Gratitude to Apple](#gratitude-to-apple)
+- [Acknowledgements](#acknowledgements)
 - [License](#license)
 
 ---
 
 ## Why SiliconRefinery?
 
-Organizations and local developers alike sit on "dark data" — unstructured logs, CSV dumps, notes, support emails, and app traces. Processing this data intelligently has historically meant sending it to cloud LLM providers, incurring token costs and privacy/compliance risks.
+Many teams and individual developers work with unstructured logs, CSV exports, support messages, and notes. Historically, extracting structure from this data has often required cloud LLM calls, with cost and privacy tradeoffs.
 
-SiliconRefinery flips the paradigm:
+SiliconRefinery focuses on local-first extraction:
 
 | Problem | SiliconRefinery's Answer |
 |---|---|
@@ -85,9 +124,9 @@ SiliconRefinery flips the paradigm:
 - Apple Silicon (M1, M2, M3, M4 series)
 - CPython 3.13+
 
-### Fastest install paths (PyPI + Homebrew)
+### Install paths (PyPI + Homebrew)
 
-For the simplest setup UX/DX, pick one:
+For straightforward setup, pick one:
 
 ```bash
 # 1) PyPI + uv (library + CLI in a project virtual environment)
@@ -157,7 +196,7 @@ Use whichever mode best fits your workflow:
 
 If `silicon-refinery` is not found after setup, open a new terminal (or run `source ~/.zshrc`) so your shell reloads PATH changes.
 
-For chat UX/perf, `silicon-refinery chat` now prefers free-threaded CPython (`3.14t`, then `3.13t`) by default and gracefully falls back to standard-GIL only if a no-GIL runtime is unavailable.
+For chat workflows, `silicon-refinery chat` prefers free-threaded CPython (`3.14t`, then `3.13t`) by default and falls back to standard-GIL only if a no-GIL runtime is unavailable.
 
 Standalone desktop app repo: [adpena/silicon-refinery-chat](https://github.com/adpena/silicon-refinery-chat) (`SiliconRefineryChat`).
 
@@ -200,7 +239,7 @@ silicon-refinery doctor
 silicon-refinery-chat
 ```
 
-The CLI formula (`Formula/silicon-refinery.rb`) and chat cask (`Casks/silicon-refinery-chat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.211` -> `0.0.212`).
+The CLI formula (`Formula/silicon-refinery.rb`) and chat cask (`Casks/silicon-refinery-chat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.212` -> `0.0.213`).
 This is enforced in CI/release via `python3 scripts/check_version_policy.py` (and `--enforce-thousandth-bump` during publish).
 
 ### Standalone Chat Repo release flow
@@ -339,13 +378,13 @@ async def main():
 asyncio.run(main())
 ```
 
-That's it. The decorated function intercepts your arguments, sends them to the on-device model, enforces the schema via `@generable()`, and returns a fully-validated `SupportTicket` object.
+The decorated function intercepts your arguments, sends them to the on-device model, enforces the schema via `@generable()`, and returns a validated `SupportTicket` object.
 
 ---
 
 ## Public API Breakdown
 
-SiliconRefinery follows a layered API design used by mature Python OSS projects:
+SiliconRefinery follows a layered API design:
 - a small, stable root import surface for day-to-day usage
 - module-level APIs for advanced workflows
 - a CLI for reproducible local development workflows
@@ -709,7 +748,7 @@ def process_data(data_payload):
 try:
     process_data({"value": "100"})
 except TypeError:
-    print("Execution continued gracefully after AI analysis.")
+    print("Execution continued after AI analysis.")
 ```
 
 **Run it:** `python use_cases/09_enhanced_debugging/example.py`
@@ -1081,9 +1120,9 @@ The following features are now implemented and covered by tests:
 - Functional pipeline API (`silicon_refinery.functional`)
 - On-device code auditor (`silicon_refinery.auditor`)
 
-### Next Priorities
+### Next Priorities (Not Yet Implemented)
 
-Build native adapters for:
+The following adapter targets are planned and are not part of the completed Phase 4 set above:
 - `io.BytesIO` / `io.StringIO` streams
 - `asyncio.StreamReader` for network data
 - `aiofiles` for async file I/O
@@ -1100,7 +1139,7 @@ Build native adapters for:
 
 - TODO: Validate API behavior on diverse real-world datasets and production-like workloads, then harden and flesh out the Python library based on findings.
 - TODO: Experiment with scaffolding a local "mixture of experts" inference pipeline + API for user-query routing/power, with both synchronous and asynchronous coverage.
-- TODO: Continue exploring the frontier of modern Python + Apple FM SDK + OSS ecosystem capabilities (free-threading, async runtimes, Arrow/Polars, DSPy, and adjacent tooling).
+- TODO: Continue expanding modern Python + Apple FM SDK integrations (free-threading, async runtimes, Arrow/Polars, DSPy, and adjacent tooling).
 
 ### Free-threading & subinterpreters (PEP 703/684)
 
@@ -1150,16 +1189,14 @@ If you have questions, ideas, or feedback:
 
 ---
 
-## Gratitude to Apple
+## Acknowledgements
 
-We extend our sincere thanks to Apple for releasing the [`python-apple-fm-sdk`](https://github.com/apple/python-apple-fm-sdk) — a Python bridge to the Foundation Models framework introduced alongside Apple Intelligence.
+SiliconRefinery is built on the [`python-apple-fm-sdk`](https://github.com/apple/python-apple-fm-sdk), which provides the Python bridge to Apple's Foundation Models framework.
 
-Special recognition to:
+Acknowledgements:
 - The **Apple Intelligence** and **Foundation Models** teams for designing a structured generation protocol (`@generable()`) that guarantees schema-valid outputs — the foundation that makes SiliconRefinery's type-safe extraction possible
 - The **`python-apple-fm-sdk`** contributors for providing first-class `asyncio` support, making it natural to build high-throughput streaming pipelines
 - The macOS engineering teams for continuing to optimize the Neural Engine inference path, enabling the throughput numbers reported in our benchmarks
-
-These are very early days for local AI. This SDK makes the possibilities truly boundless for the open-source community.
 
 ---
 

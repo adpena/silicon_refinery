@@ -2,7 +2,8 @@
 
 Standalone repo mirror: [adpena/silicon-refinery-chat](https://github.com/adpena/silicon-refinery-chat)
 
-A demo desktop app for Apple Foundation Models that runs fully local and is designed for realtime UX:
+A desktop app for Apple Foundation Models that runs fully local and is designed for realtime UX.
+It is both a production-oriented local chat application and a reference implementation for Python developers who want to understand and ship SDK-powered chat workflows quickly.
 
 - Realtime streaming responses
 - Sidebar vertical chat tabs (Codex-style stacked conversations)
