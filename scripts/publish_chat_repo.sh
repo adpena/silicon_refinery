@@ -114,6 +114,31 @@ PY
 )"
 APP_VERSION="${APP_VERSION//[[:space:]]/}"
 
+ROOT_VERSION="$(
+ROOT_DIR="$ROOT_DIR" python3 - <<'PY'
+import os
+import pathlib
+import tomllib
+
+path = pathlib.Path(os.environ["ROOT_DIR"]) / "pyproject.toml"
+with path.open("rb") as f:
+    data = tomllib.load(f)
+print(data["project"]["version"])
+PY
+)"
+ROOT_VERSION="${ROOT_VERSION//[[:space:]]/}"
+
+if [[ "$APP_VERSION" != "$ROOT_VERSION" ]]; then
+  echo "Error: chat app version (${APP_VERSION}) does not match root version (${ROOT_VERSION})." >&2
+  echo "Set examples/toga_local_chat_app/pyproject.toml versions to ${ROOT_VERSION} before publish." >&2
+  exit 1
+fi
+
+if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Error: expected semantic version format <major>.<minor>.<patch>, got '${APP_VERSION}'." >&2
+  exit 1
+fi
+
 if [[ -z "$CHAT_RELEASE_TAG" ]]; then
   CHAT_RELEASE_TAG="v${APP_VERSION}"
 fi
@@ -180,9 +205,9 @@ FOUND_ARTIFACTS=()
 if [[ -d "$ARTIFACT_SOURCE_DIR" ]]; then
   shopt -s nullglob
   FOUND_ARTIFACTS=(
-    "$ARTIFACT_SOURCE_DIR"/*.dmg
-    "$ARTIFACT_SOURCE_DIR"/*.pkg
-    "$ARTIFACT_SOURCE_DIR"/*.zip
+    "$ARTIFACT_SOURCE_DIR"/*-"$APP_VERSION".dmg
+    "$ARTIFACT_SOURCE_DIR"/*-"$APP_VERSION".pkg
+    "$ARTIFACT_SOURCE_DIR"/*-"$APP_VERSION".zip
   )
   shopt -u nullglob
 fi
@@ -261,6 +286,21 @@ fi
 if [[ "$CHAT_SKIP_RELEASE" == "1" ]]; then
   log "Skipping release sync by request"
 else
+  prune_release_assets() {
+    local existing_assets=()
+    mapfile -t existing_assets < <(gh release view "$CHAT_RELEASE_TAG" --repo "$CHAT_REPO" --json assets --jq '.assets[].name')
+    for asset_name in "${existing_assets[@]}"; do
+      case "$asset_name" in
+        *-"$APP_VERSION".dmg|*-"$APP_VERSION".pkg|*-"$APP_VERSION".zip)
+          ;;
+        *)
+          log "Removing stale release asset: ${asset_name}"
+          gh release delete-asset "$CHAT_RELEASE_TAG" --repo "$CHAT_REPO" "$asset_name" -y
+          ;;
+      esac
+    done
+  }
+
   if [[ "${#FOUND_ARTIFACTS[@]}" -gt 0 ]]; then
     shopt -s nullglob
     RELEASE_ASSETS=("$ARTIFACT_DEST_DIR"/*)
@@ -275,6 +315,7 @@ else
         --notes "$CHAT_RELEASE_NOTES" \
         "${RELEASE_ASSETS[@]}"
     fi
+    prune_release_assets
   else
     log "No release assets found; skipping release upload"
   fi

@@ -200,7 +200,7 @@ silicon-refinery doctor
 silicon-refinery-chat
 ```
 
-Current CLI formula is HEAD-based (`Formula/silicon-refinery.rb`) while `apple-fm-sdk` remains git-sourced. The app installer is distributed as a cask (`Casks/silicon-refinery-chat.rb`) backed by release DMG assets from `adpena/silicon-refinery-chat`.
+The CLI formula (`Formula/silicon-refinery.rb`) and chat cask (`Casks/silicon-refinery-chat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.209` -> `0.0.210`).
 
 ### Standalone Chat Repo release flow
 

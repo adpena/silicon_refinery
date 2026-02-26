@@ -1,6 +1,6 @@
 cask "silicon-refinery-chat" do
-  version "0.1.0"
-  sha256 "48f71223bd4c3f52e5b8d2ca52c771346f0da5ab1906b5b0d1dd10ddad798945"
+  version "0.0.209"
+  sha256 "3b556f906aba5a65f910068560e9fd04438afb203359071db24e52091999345c"
 
   url "https://github.com/adpena/silicon-refinery-chat/releases/download/v#{version}/SiliconRefineryChat-#{version}.dmg"
   name "SiliconRefineryChat"
