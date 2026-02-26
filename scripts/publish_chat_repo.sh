@@ -307,11 +307,9 @@ if [[ "$CHAT_SKIP_BUILD" != "1" ]]; then
   log "Building macOS app artifact with Briefcase"
   uv sync --project "$APP_DIR" --directory "$APP_DIR"
   BRIEFCASE_CREATE_DIR="$APP_DIR/build/silicon_refinery_chat/macos/app"
-  if [[ -d "$BRIEFCASE_CREATE_DIR" ]]; then
-    log "Briefcase create already initialized; skipping create step"
-  else
-    uv run --project "$APP_DIR" --directory "$APP_DIR" briefcase create macOS --no-input
-  fi
+  log "Recreating Briefcase scaffold to refresh metadata (version/name/signing params)"
+  rm -rf "$BRIEFCASE_CREATE_DIR"
+  uv run --project "$APP_DIR" --directory "$APP_DIR" briefcase create macOS --no-input
   cleanup_stale_chat_launcher_shims
   uv run --project "$APP_DIR" --directory "$APP_DIR" briefcase build macOS --no-input
   inject_chat_launcher_shim
