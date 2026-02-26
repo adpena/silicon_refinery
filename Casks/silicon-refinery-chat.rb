@@ -8,6 +8,8 @@ cask "silicon-refinery-chat" do
   homepage "https://github.com/adpena/silicon-refinery-chat"
 
   app "SiliconRefineryChat.app"
+  binary "#{appdir}/SiliconRefineryChat.app/Contents/MacOS/SiliconRefineryChat",
+         target: "silicon-refinery-chat"
 
   zap trash: [
     "~/Library/Application Support/com.siliconrefinery.chat",

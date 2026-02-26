@@ -103,11 +103,12 @@ silicon-refinery doctor
 ```bash
 # 2) Homebrew (CLI + standalone desktop app, minimal flow)
 brew tap adpena/silicon-refinery https://github.com/adpena/homebrew-silicon-refinery
-brew install --HEAD adpena/silicon-refinery/silicon-refinery
-brew install --cask adpena/silicon-refinery/silicon-refinery-chat
+brew install silicon-refinery
+brew install silicon-refinery-chat
 
 # Verify
 silicon-refinery doctor
+silicon-refinery-chat
 ```
 
 ### One-command setup (recommended)
@@ -192,9 +193,11 @@ git push origin main --tags
 #    - Casks/silicon-refinery-chat.rb
 
 # 3) Validate the installed command
+brew install silicon-refinery
+brew install silicon-refinery-chat
 silicon-refinery --help
 silicon-refinery doctor
-brew install --cask adpena/silicon-refinery/silicon-refinery-chat
+silicon-refinery-chat
 ```
 
 Current CLI formula is HEAD-based (`Formula/silicon-refinery.rb`) while `apple-fm-sdk` remains git-sourced. The app installer is distributed as a cask (`Casks/silicon-refinery-chat.rb`) backed by release DMG assets from `adpena/silicon-refinery-chat`.

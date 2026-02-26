@@ -3,7 +3,9 @@ class SiliconRefinery < Formula
   homepage "https://github.com/adpena/silicon-refinery"
   license "MIT"
 
-  # HEAD-only for now while Apple FM SDK dependency remains GitHub-sourced.
+  url "https://github.com/adpena/silicon-refinery/archive/refs/tags/v0.0.209.tar.gz"
+  sha256 "7cabf835867bff8c543b8a7f5944746c21407d5c5420f0540ac057bd569b533e"
+  version "0.0.209"
   head "https://github.com/adpena/silicon-refinery.git", branch: "main"
 
   depends_on "uv"
