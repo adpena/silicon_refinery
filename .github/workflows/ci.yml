@@ -20,6 +20,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate version policy
+        run: python3 scripts/check_version_policy.py
+
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true

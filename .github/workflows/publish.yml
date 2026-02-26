@@ -14,6 +14,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --tags --force
+
+      - name: Validate version policy
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ -n "${RELEASE_TAG:-}" ]; then
+            python3 scripts/check_version_policy.py --enforce-thousandth-bump --release-tag "${RELEASE_TAG}"
+          else
+            python3 scripts/check_version_policy.py
+          fi
 
       - uses: astral-sh/setup-uv@v5
         with:
