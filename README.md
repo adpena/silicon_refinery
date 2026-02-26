@@ -356,7 +356,7 @@ from silicon_refinery import (
 | `local_extract` | Decorator factory | `(schema, retries=3, debug_timing=False)` | Turn an async function into structured on-device extraction |
 | `stream_extract` | Async generator | `(source_iterable, schema, ..., concurrency=None)` | High-throughput extraction over streams |
 | `Source`, `Extract`, `Sink` | Pipeline nodes | `Source(iterable) >> Extract(schema) >> Sink(callback)` | Declarative ETL pipelines |
-| `enhanced_debug` | Decorator factory | `(route_to=\"stdout\", prompt_file=None)` | AI-assisted crash analysis |
+| `enhanced_debug` | Decorator factory | `(summary_to=\"stderr\", prompt_to=\"stdout\", silenced=False, summary_log_level=\"error\", prompt_log_level=\"info\")` | AI-assisted crash analysis |
 | `AppleFMSetupError` | Exception | setup/runtime exception type | Consistent SDK/model troubleshooting diagnostics |
 
 ### Module-level API index
@@ -629,7 +629,13 @@ A decorator that catches exceptions, prints the standard Python traceback, and t
 #### Signature
 
 ```python
-@enhanced_debug(route_to: str = "stdout", prompt_file: str | None = None)
+@enhanced_debug(
+    summary_to: str | None = "stderr",
+    prompt_to: str | None = "stdout",
+    silenced: bool = False,
+    summary_log_level: str | int = "error",
+    prompt_log_level: str | int = "info",
+)
 def your_function(...):
     ...
 ```
@@ -638,8 +644,11 @@ def your_function(...):
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `route_to` | `str` | `"stdout"` | Where to print the AI analysis: `"stdout"` or `"log"` (via `logging.error`). |
-| `prompt_file` | `str \| None` | `None` | If set, writes a detailed prompt payload to this file — ready to paste into Claude, Codex, or any coding assistant for a deeper fix. |
+| `summary_to` | `str \| None` | `"stderr"` | Where to print the AI analysis: `"stdout"`, `"stderr"`, or `"log"`. Set `None` to silence analysis output. |
+| `prompt_to` | `str \| None` | `"stdout"` | Where the generated debug prompt goes: `"stdout"` (default), `"stderr"`, `"log"`, a relative/absolute file path (written as `.txt`), or `None` to silence prompt output. |
+| `silenced` | `bool` | `False` | Master mute switch. If `True`, all enhanced debug output is suppressed and analysis is skipped. |
+| `summary_log_level` | `str \| int` | `"error"` | Logging level used when `summary_to="log"` (for example: `"warning"`, `"error"`, `"critical"`). |
+| `prompt_log_level` | `str \| int` | `"info"` | Logging level used when `prompt_to="log"` (for example: `"debug"`, `"info"`, `"warning"`). |
 
 #### What happens when the function crashes
 
@@ -650,7 +659,7 @@ def your_function(...):
    - `possible_causes` — List of likely root causes
    - `certainty_level` — `"LOW"`, `"MEDIUM"`, or `"HIGH"`
    - `suggested_fix` — Actionable steps to resolve the issue
-4. If `prompt_file` is set, a formatted prompt file is written for use with external coding agents
+4. Prompt payload output is routed via `prompt_to` (`"stdout"` by default, `"stderr"`, `"log"`, file path for `.txt`, or `None` to silence)
 5. The original exception is re-raised (the decorator never swallows exceptions)
 
 #### Sample AI analysis output
@@ -678,7 +687,7 @@ A [sample generated prompt file](use_cases/09_enhanced_debugging/sample_crash_re
 ```python
 from silicon_refinery import enhanced_debug
 
-@enhanced_debug(route_to="stdout", prompt_file="crash_report_for_llm.txt")
+@enhanced_debug(prompt_to="crash_report_for_llm.txt")
 def process_data(data_payload):
     """A buggy function that will inevitably crash."""
     parsed_value = data_payload["value"] + 10  # TypeError!

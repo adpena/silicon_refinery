@@ -1,7 +1,7 @@
 from silicon_refinery import enhanced_debug
 
 
-@enhanced_debug(route_to="stdout", prompt_file="crash_report_for_llm.txt")
+@enhanced_debug(prompt_to="crash_report_for_llm.txt")
 def process_data(data_payload):
     """A buggy function that will inevitably crash."""
     print("Processing payload...")

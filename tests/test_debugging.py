@@ -7,8 +7,9 @@ Covers:
   - Normal execution returns value (sync + async)
   - Exception re-raised after analysis (sync + async)
   - _handle_exception: traceback printing to stderr
-  - _handle_exception: stdout vs log routing
-  - prompt_file generation
+  - _handle_exception: stdout/stderr/None routing
+  - prompt_to routing and file generation
+  - silenced mode
   - Model unavailability graceful degradation
   - FM analysis failure graceful degradation
 """
@@ -253,7 +254,7 @@ class TestHandleException:
             assert "Check denominator" in captured.out
             assert "HIGH" in captured.out
 
-    async def test_log_route_uses_logger(self, caplog):
+    async def test_stderr_route_prints_analysis(self, capsys):
         mock_model = make_mock_model(available=True)
         mock_session = MagicMock()
         mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
@@ -264,13 +265,43 @@ class TestHandleException:
         ):
             from silicon_refinery.debugging import _handle_exception
 
-            with caplog.at_level(logging.ERROR, logger="silicon_refinery.debug"):
-                try:
-                    raise RuntimeError("log test")
-                except RuntimeError as e:
-                    await _handle_exception(e, "test_func", "log", None)
+            try:
+                raise RuntimeError("stderr test")
+            except RuntimeError as e:
+                await _handle_exception(e, "test_func", "stderr", None)
 
-            assert any("SiliconRefinery AI Debug Analysis" in r.message for r in caplog.records)
+            captured = capsys.readouterr()
+            assert "SiliconRefinery AI Debug Analysis" in captured.err
+
+    async def test_log_route_uses_selected_level(self, caplog):
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            with caplog.at_level(logging.DEBUG, logger="silicon_refinery.debug"):
+                try:
+                    raise RuntimeError("log level test")
+                except RuntimeError as e:
+                    await _handle_exception(
+                        e,
+                        "test_func",
+                        summary_to="log",
+                        prompt_to=None,
+                        summary_log_level="warning",
+                    )
+
+            matching = [
+                r
+                for r in caplog.records
+                if "SiliconRefinery AI Debug Analysis" in r.message and r.levelno == logging.WARNING
+            ]
+            assert matching
 
     async def test_analysis_output_contains_all_causes(self, capsys):
         """All possible causes should appear in the output."""
@@ -300,12 +331,12 @@ class TestHandleException:
 
 
 # ========================================================================
-# Prompt file generation
+# Prompt routing generation
 # ========================================================================
 
 
 class TestPromptFileGeneration:
-    async def test_prompt_file_written(self, capsys):
+    async def test_prompt_to_written(self, capsys):
         mock_model = make_mock_model(available=True)
         mock_session = MagicMock()
         mock_session.respond = AsyncMock(
@@ -344,8 +375,8 @@ class TestPromptFileGeneration:
             finally:
                 os.unlink(prompt_path)
 
-    async def test_prompt_file_message_printed(self, capsys):
-        """A confirmation message should be printed when prompt_file is written."""
+    async def test_prompt_to_message_printed(self, capsys):
+        """A confirmation message should be printed when prompt_to is written."""
         mock_model = make_mock_model(available=True)
         mock_session = MagicMock()
         mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
@@ -370,7 +401,7 @@ class TestPromptFileGeneration:
             finally:
                 os.unlink(prompt_path)
 
-    async def test_no_prompt_file_when_none(self, capsys):
+    async def test_no_prompt_to_when_none(self, capsys):
         mock_model = make_mock_model(available=True)
         mock_session = MagicMock()
         mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
@@ -388,6 +419,81 @@ class TestPromptFileGeneration:
 
             captured = capsys.readouterr()
             assert "Generated AI Agent Prompt written to" not in captured.out
+
+    async def test_prompt_to_defaults_to_stdout(self, capsys):
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            try:
+                raise RuntimeError("default stdout prompt")
+            except RuntimeError as e:
+                await _handle_exception(e, "func", "stdout")
+
+            captured = capsys.readouterr()
+            assert "I encountered a crash in my Python application." in captured.out
+
+    async def test_prompt_to_path_without_suffix_writes_txt(self, capsys):
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                prompt_path = os.path.join(tmpdir, "llm_crash_report")
+                expected_path = f"{prompt_path}.txt"
+
+                try:
+                    raise RuntimeError("suffix test")
+                except RuntimeError as e:
+                    await _handle_exception(e, "func", "stdout", prompt_path)
+
+                assert os.path.exists(expected_path)
+                with open(expected_path) as f:
+                    content = f.read()
+                assert "suffix test" in content
+
+    async def test_prompt_to_log_uses_selected_level(self, caplog):
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            with caplog.at_level(logging.DEBUG, logger="silicon_refinery.debug"):
+                try:
+                    raise RuntimeError("prompt log test")
+                except RuntimeError as e:
+                    await _handle_exception(
+                        e,
+                        "func",
+                        summary_to="stderr",
+                        prompt_to="log",
+                        prompt_log_level="debug",
+                    )
+
+            matching = [
+                r
+                for r in caplog.records
+                if "I encountered a crash in my Python application." in r.message
+                and r.levelno == logging.DEBUG
+            ]
+            assert matching
 
 
 # ========================================================================
@@ -482,13 +588,13 @@ class TestEnhancedDebugAnalysisFailure:
 
 
 # ========================================================================
-# route_to parameter
+# summary_to parameter
 # ========================================================================
 
 
 class TestEnhancedDebugRouting:
-    def test_route_to_stdout_via_decorator(self, capsys):
-        """Integration test: decorator with route_to='stdout' prints analysis."""
+    def test_summary_to_stdout_via_decorator(self, capsys):
+        """Integration test: decorator with summary_to='stdout' prints analysis."""
         mock_model = make_mock_model(available=True)
         mock_session = MagicMock()
         mock_session.respond = AsyncMock(
@@ -504,7 +610,7 @@ class TestEnhancedDebugRouting:
         ):
             from silicon_refinery.debugging import enhanced_debug
 
-            @enhanced_debug(route_to="stdout")
+            @enhanced_debug(summary_to="stdout")
             def failing_func():
                 raise RuntimeError("decorated failure")
 
@@ -515,8 +621,8 @@ class TestEnhancedDebugRouting:
             # Analysis should be in stdout
             assert "Decorated error" in captured.out
 
-    def test_prompt_file_via_decorator(self, capsys):
-        """Integration test: decorator with prompt_file writes the file."""
+    def test_prompt_to_via_decorator(self, capsys):
+        """Integration test: decorator with prompt_to writes the file."""
         mock_model = make_mock_model(available=True)
         mock_session = MagicMock()
         mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
@@ -532,7 +638,7 @@ class TestEnhancedDebugRouting:
 
             try:
 
-                @enhanced_debug(route_to="stdout", prompt_file=prompt_path)
+                @enhanced_debug(summary_to="stdout", prompt_to=prompt_path)
                 def failing_func():
                     raise RuntimeError("file test")
 
@@ -546,6 +652,46 @@ class TestEnhancedDebugRouting:
             finally:
                 if os.path.exists(prompt_path):
                     os.unlink(prompt_path)
+
+    async def test_summary_to_none_silences_analysis(self, capsys):
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            try:
+                raise RuntimeError("route none test")
+            except RuntimeError as e:
+                await _handle_exception(e, "test_func", None, None)
+
+            captured = capsys.readouterr()
+            assert "SiliconRefinery AI Debug Analysis" not in captured.out
+
+
+class TestEnhancedDebugSilenced:
+    async def test_silenced_true_skips_all_output_and_analysis(self, capsys):
+        mock_model = make_mock_model(available=True)
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession") as sess_cls,
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            try:
+                raise RuntimeError("fully silenced")
+            except RuntimeError as e:
+                await _handle_exception(e, "func", "stdout", "stdout", True)
+
+            captured = capsys.readouterr()
+            assert captured.out == ""
+            assert captured.err == ""
+            sess_cls.assert_not_called()
 
 
 # ========================================================================
@@ -573,7 +719,7 @@ class TestEnhancedDebugTimeoutHandling:
         ):
             from silicon_refinery.debugging import enhanced_debug
 
-            @enhanced_debug(route_to="stdout")
+            @enhanced_debug(summary_to="stdout")
             def bad_func():
                 raise ValueError("original error must survive")
 
@@ -608,7 +754,7 @@ class TestEnhancedDebugTimeoutHandling:
         ):
             from silicon_refinery.debugging import enhanced_debug
 
-            @enhanced_debug(route_to="stdout")
+            @enhanced_debug(summary_to="stdout")
             def bad_func():
                 raise TypeError("type error is original")
 
@@ -646,7 +792,7 @@ class TestEnhancedDebugTimeoutHandling:
         ):
             from silicon_refinery.debugging import enhanced_debug
 
-            @enhanced_debug(route_to="stdout")
+            @enhanced_debug(summary_to="stdout")
             def divide():
                 return 1 / 0
 
@@ -659,7 +805,7 @@ class TestEnhancedDebugTimeoutHandling:
         ):
             from silicon_refinery.debugging import enhanced_debug
 
-            @enhanced_debug(route_to="stdout")
+            @enhanced_debug(summary_to="stdout")
             def bad_func():
                 raise ValueError("original")
 
