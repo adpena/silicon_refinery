@@ -157,7 +157,7 @@ verify_release_artifact_trust() {
   local suffix app_mount app_path codesign_details
 
   suffix="${artifact##*.}"
-  suffix="${suffix,,}"
+  suffix="$(printf '%s' "$suffix" | tr '[:upper:]' '[:lower:]')"
   case "$suffix" in
     dmg)
       require_cmd xcrun

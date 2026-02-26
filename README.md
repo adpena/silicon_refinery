@@ -200,7 +200,7 @@ silicon-refinery doctor
 silicon-refinery-chat
 ```
 
-The CLI formula (`Formula/silicon-refinery.rb`) and chat cask (`Casks/silicon-refinery-chat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.210` -> `0.0.211`).
+The CLI formula (`Formula/silicon-refinery.rb`) and chat cask (`Casks/silicon-refinery-chat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.211` -> `0.0.212`).
 This is enforced in CI/release via `python3 scripts/check_version_policy.py` (and `--enforce-thousandth-bump` during publish).
 
 ### Standalone Chat Repo release flow
@@ -963,6 +963,8 @@ Running 1,000 unstructured records through `stream_extract` with `lines_per_chun
 
 ### Context window limits (use case 08)
 
+#### Local testing results (empirical)
+
 Payload escalation test — progressively larger input texts:
 
 | Input size | Approx. tokens | Result | Time |
@@ -972,7 +974,17 @@ Payload escalation test — progressively larger input texts:
 | 50,000 chars | ~12,500 | Success | ~25s |
 | ~32,000+ chars | ~8,000+ | `ExceededContextWindowSizeError` | — |
 
-The context window limit is approximately 32,000 characters. This is why `stream_extract` defaults to `history_mode="clear"` — recreating the session per chunk prevents context accumulation on infinite streams.
+#### Apple's official published limit
+
+Apple's official published guidance indicates the on-device Foundation Models context window is currently **4,096 tokens per language model session** (input + output combined), as documented by Apple engineers in the Developer Forums and linked to TN3193.
+
+Sources:
+- [Apple Developer Forums — FoundationModel, context length, and testing (thread 806542)](https://developer.apple.com/forums/thread/806542)
+- [Apple Technical Note TN3193 — Managing the on-device foundation model’s context window](https://developer.apple.com/documentation/technotes/tn3193-adding-intelligence-to-your-app-with-foundation-models)
+
+#### Comparison and interpretation
+
+Our local character-based escalation test is still useful for practical boundary testing, but character-to-token conversions are approximate and can diverge from true tokenizer accounting. For production guardrails, we treat Apple's published **4,096-token** limit as authoritative. This is why `stream_extract` defaults to `history_mode="clear"` — recreating the session per chunk prevents context accumulation on long-running streams.
 
 **Reproduce it:** `python use_cases/08_context_limit_test/example.py`
 
@@ -1077,13 +1089,17 @@ Build native adapters for:
 - `aiofiles` for async file I/O
 - `websockets` for real-time data feeds
 
-### SiliconRefineryChat Demo Roadmap
+### SiliconRefineryChat App Roadmap (`examples/toga_local_chat_app`)
 
 - TODO: Add support for attachments in `examples/toga_local_chat_app` with a nonblocking ingest pipeline and streaming-safe UI integration.
 - TODO: Build conversation-query mode so users can start a chat that queries the sqlite database containing all prior conversations.
 - TODO: Implement durable memory behavior for SiliconRefineryChat so relevant context can persist and be reused safely across sessions.
-- TODO: Harden context compaction and add targeted tests for guardrail behavior and error handling paths.
+- TODO: Harden context compaction and add targeted tests for guardrail behavior and error handling paths in the desktop chat runtime.
+
+### SiliconRefinery Python Library Roadmap (`silicon_refinery/`)
+
 - TODO: Validate API behavior on diverse real-world datasets and production-like workloads, then harden and flesh out the Python library based on findings.
+- TODO: Experiment with scaffolding a local "mixture of experts" inference pipeline + API for user-query routing/power, with both synchronous and asynchronous coverage.
 - TODO: Continue exploring the frontier of modern Python + Apple FM SDK + OSS ecosystem capabilities (free-threading, async runtimes, Arrow/Polars, DSPy, and adjacent tooling).
 
 ### Free-threading & subinterpreters (PEP 703/684)
