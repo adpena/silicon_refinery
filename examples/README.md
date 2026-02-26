@@ -50,6 +50,26 @@ silicon-refinery smoke
 silicon-refinery notebook
 ```
 
+```text
+Actual output excerpt from local run (`silicon-refinery example --list`):
+
+Available examples:
+  arrow_bridge
+  code_auditor
+  context_scope
+  custom_backend
+  extraction_cache
+  free_threading
+  functional_pipeline
+  hot_folder_watcher
+  jit_diagnostics
+  mmap_scanner
+  simple_inference
+  streaming_example
+  transcript_processing
+  trio_adapter
+```
+
 For the Toga + Briefcase desktop chat demo:
 
 ```bash

@@ -37,6 +37,18 @@ silicon-refinery chat
 uv run --project examples/toga_local_chat_app --directory examples/toga_local_chat_app briefcase dev
 ```
 
+```text
+Actual output excerpt from local run (`silicon-refinery chat --help`):
+
+Usage: silicon-refinery chat [OPTIONS] [APP_ARGS]...
+Options:
+  --python
+  --no-run
+  -r, --update-requirements
+  --standard-gil
+  -h, --help
+```
+
 `silicon-refinery chat` now prefers free-threaded CPython (`3.14t` then `3.13t`) automatically and only falls back to standard-GIL when no no-GIL runtime is available.
 
 For maximum demo stability, force standard-GIL directly:
@@ -73,9 +85,11 @@ briefcase build macOS
 briefcase package macOS --adhoc-sign
 
 # Redistributable build (Developer ID signing)
-briefcase package macOS --identity "Developer ID Application: <YOUR NAME> (<TEAM_ID>)" --no-notarize
-APPLE_NOTARY_PROFILE="<YOUR_NOTARY_PROFILE>" \
-  ../../scripts/notarize_macos_artifact.sh --artifact "dist/SiliconRefineryChat-<VERSION>.dmg" --app-name "SiliconRefineryChat.app"
+export CHAT_SIGN_IDENTITY="${CHAT_SIGN_IDENTITY:?Set your Developer ID identity string first}"
+export APPLE_NOTARY_PROFILE="${APPLE_NOTARY_PROFILE:?Set your stored notary profile name first}"
+briefcase package macOS --identity "$CHAT_SIGN_IDENTITY" --no-notarize
+APPLE_NOTARY_PROFILE="$APPLE_NOTARY_PROFILE" \
+  ../../scripts/notarize_macos_artifact.sh --artifact "$(ls -t dist/SiliconRefineryChat-*.dmg | head -n 1)" --app-name "SiliconRefineryChat.app"
 ```
 
 `--adhoc-sign` artifacts are local-only and will trigger Gatekeeper warnings on other machines. Use Developer ID + notarization for user-facing releases.

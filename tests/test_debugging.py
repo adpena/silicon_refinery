@@ -371,7 +371,7 @@ class TestPromptFileGeneration:
                 assert "NPE" in content
                 assert "null ref" in content
                 assert "Add null check" in content
-                assert "expert developer" in content
+                assert "Debugging objective for the next agent" in content
             finally:
                 os.unlink(prompt_path)
 
@@ -494,6 +494,208 @@ class TestPromptFileGeneration:
                 and r.levelno == logging.DEBUG
             ]
             assert matching
+
+
+# ========================================================================
+# Context overflow retries / query shaping
+# ========================================================================
+
+
+class TestContextOverflowRetries:
+    async def test_retries_with_smaller_payload_on_context_overflow(self, capsys):
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(
+            side_effect=[
+                RuntimeError("ExceededContextWindowSizeError: context window exceeded"),
+                MockDebuggingAnalysis(),
+            ]
+        )
+        fake_tb = (
+            ["Traceback (most recent call last):\n"]
+            + [f'  File "/tmp/app.py", line {i}, in fn_{i}\n' for i in range(200)]
+            + ["RuntimeError: context overflow test\n"]
+        )
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+            patch("silicon_refinery.debugging.traceback.format_exception", return_value=fake_tb),
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            try:
+                raise RuntimeError("context overflow test")
+            except RuntimeError as e:
+                await _handle_exception(e, "func", "stdout", None)
+
+            captured = capsys.readouterr()
+            assert "Context window overflow detected" in captured.err
+            assert mock_session.respond.await_count == 2
+            first_query = mock_session.respond.await_args_list[0].args[0]
+            second_query = mock_session.respond.await_args_list[1].args[0]
+            assert len(second_query) < len(first_query)
+
+    async def test_retries_on_sdk_context_overflow_exception_type(self, capsys):
+        class FakeExceededContextWindowSizeError(Exception):
+            pass
+
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(
+            side_effect=[
+                FakeExceededContextWindowSizeError("Context window size exceeded"),
+                MockDebuggingAnalysis(),
+            ]
+        )
+        fake_tb = (
+            ["Traceback (most recent call last):\n"]
+            + [f'  File "/tmp/app.py", line {i}, in fn_{i}\n' for i in range(160)]
+            + ["RuntimeError: overflow with typed exception\n"]
+        )
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+            patch(
+                "silicon_refinery.debugging.fm.ExceededContextWindowSizeError",
+                FakeExceededContextWindowSizeError,
+            ),
+            patch("silicon_refinery.debugging.traceback.format_exception", return_value=fake_tb),
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            try:
+                raise RuntimeError("overflow with typed exception")
+            except RuntimeError as e:
+                await _handle_exception(e, "func", "stdout", None)
+
+            captured = capsys.readouterr()
+            assert "Context window overflow detected" in captured.err
+            assert mock_session.respond.await_count == 2
+
+    async def test_query_payload_respects_char_budget(self):
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
+        huge_tb = (
+            ["Traceback (most recent call last):\n"]
+            + [f'  File "/tmp/huge.py", line {i}, in fn_{i}\n' for i in range(5000)]
+            + ["RuntimeError: huge traceback\n"]
+        )
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+            patch("silicon_refinery.debugging.traceback.format_exception", return_value=huge_tb),
+        ):
+            from silicon_refinery.debugging import _DEBUG_QUERY_MAX_CHARS, _handle_exception
+
+            try:
+                raise RuntimeError("huge traceback")
+            except RuntimeError as e:
+                await _handle_exception(e, "func", "stdout", None)
+
+            query = mock_session.respond.await_args_list[0].args[0]
+            assert len(query) <= _DEBUG_QUERY_MAX_CHARS
+            assert "Traceback truncated by character budget" in query
+
+    async def test_small_traceback_does_not_retry_identical_payloads(self, capsys):
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(
+            side_effect=RuntimeError("ExceededContextWindowSizeError: tiny traceback")
+        )
+        small_tb = [
+            "Traceback (most recent call last):\n",
+            '  File "/tmp/app.py", line 1, in fn\n',
+            "RuntimeError: tiny traceback\n",
+        ]
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+            patch("silicon_refinery.debugging.traceback.format_exception", return_value=small_tb),
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            try:
+                raise RuntimeError("tiny traceback")
+            except RuntimeError as e:
+                await _handle_exception(e, "func", "stdout", None)
+
+            captured = capsys.readouterr()
+            assert "AI analysis failed" in captured.err
+            assert mock_session.respond.await_count == 1
+
+
+# ========================================================================
+# Two-stage pipeline (forensic triage + handoff)
+# ========================================================================
+
+
+class TestTwoStageDebugPipeline:
+    async def test_prompt_mode_runs_second_handoff_query(self, capsys):
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(return_value=MockDebuggingAnalysis())
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            try:
+                raise RuntimeError("two stage test")
+            except RuntimeError as e:
+                await _handle_exception(e, "func", "stdout", "stdout")
+
+            captured = capsys.readouterr()
+            assert mock_session.respond.await_count == 2
+            first_query = mock_session.respond.await_args_list[0].args[0]
+            second_query = mock_session.respond.await_args_list[1].args[0]
+            assert "Local source snippets around failing frames" in first_query
+            assert "Expected output:" in second_query
+            assert "candidate_edits" in second_query
+            assert "I encountered a crash in my Python application." in captured.out
+
+    async def test_handoff_retry_on_context_overflow(self, capsys):
+        class FakeHandoff:
+            def __init__(self):
+                self.objective = "Fix root cause and validate."
+                self.prioritized_steps = ["Inspect frame F1", "Patch type normalization"]
+                self.candidate_edits = ["app.py:10-18 | convert value to int"]
+                self.instrumentation = ["app.py:10 | log incoming payload type"]
+                self.verification_commands = ["uv run pytest tests/test_debugging.py -q"]
+                self.risks = ["May affect callers that rely on implicit coercion"]
+                self.handoff_prompt = "Use evidence-backed edits only."
+
+        mock_model = make_mock_model(available=True)
+        mock_session = MagicMock()
+        mock_session.respond = AsyncMock(
+            side_effect=[
+                MockDebuggingAnalysis(),
+                RuntimeError("Context window size exceeded"),
+                FakeHandoff(),
+            ]
+        )
+
+        with (
+            patch("apple_fm_sdk.SystemLanguageModel", return_value=mock_model),
+            patch("apple_fm_sdk.LanguageModelSession", return_value=mock_session),
+        ):
+            from silicon_refinery.debugging import _handle_exception
+
+            try:
+                raise RuntimeError("handoff overflow")
+            except RuntimeError as e:
+                await _handle_exception(e, "func", "stdout", "stdout")
+
+            captured = capsys.readouterr()
+            assert "Context window overflow during handoff generation" in captured.err
+            assert "Use evidence-backed edits only." in captured.out
+            assert mock_session.respond.await_count == 3
 
 
 # ========================================================================

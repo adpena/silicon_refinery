@@ -1,18 +1,119 @@
-I encountered a crash in my Python application. Here is the traceback:
+I encountered a crash in my Python application.
+
+Debugging objective for the next agent:
+- Perform deep, evidence-based debugging only.
+- Avoid assumptions and hallucinations; explicitly call out unknowns.
+- Include concrete line/frame references, exception details, and logging clues.
+- Prioritize actionable validation steps and instrumentation suggestions.
+
+Crash context:
+- Function wrapper: process_data
+- Exception: TypeError: can only concatenate str (not 'int') to str
+- Stage1 context-window retries used: 0
+- Stage2 context-window retries used: 0
+
+Traceback (full, chronological):
 ```python
 Traceback (most recent call last):
-  File "silicon_refinery/debugging.py", line 53, in sync_wrapper
-    return func(*args, **kwargs)
-  File "use_cases/09_enhanced_debugging/example.py", line 9, in process_data
-    parsed_value = data_payload["value"] + 10
-                   ~~~~~~~~~~~~~~~~~~~~~~^~~~
-TypeError: can only concatenate str (not "int") to str
+  File "<stdin>", line 70, in main
+TypeError: can only concatenate str (not 'int') to str
 
 ```
 
-A local AI agent performed a preliminary analysis and concluded:
-- Summary: The error occurs because `data_payload` contains a string, and attempting to add an integer to it results in a TypeError.
-- Possible Causes: `data_payload` is not being correctly initialized or parsed as an integer., Data payload format is incorrect, leading to unexpected types in the dictionary.
-- Suggested Fix: Ensure `data_payload` is initialized or parsed correctly as an integer before performing arithmetic operations.
+Crash envelope (frames + snippets + triage cues):
+```text
+Crash Envelope
+- function_wrapper: process_data
+- exception: TypeError: can only concatenate str (not 'int') to str
+- traceback_lines: 3
 
-Please act as an expert developer (like Jeff Dean or a top-tier engineer). Provide a comprehensive, patched version of the code that resolves this issue, along with any necessary explanations.
+Frame Hints:
+- F1 | <stdin>:70 | main | code=
+
+Logging Signals:
+- none detected
+
+Source Snippets:
+- no readable local source snippets found for traceback frames
+
+Traceback Tail:
+'''python
+Traceback (most recent call last):
+  File "<stdin>", line 70, in main
+TypeError: can only concatenate str (not 'int') to str
+'''
+```
+
+Query payload sent to the local model (context-budgeted):
+```text
+You are a senior debugging analyst. Provide a strict, evidence-based diagnosis of this Python failure.
+
+Rules:
+- Use only evidence from the provided traceback and signals.
+- Do not invent files, line numbers, stack frames, logs, or runtime state.
+- If evidence is insufficient, state uncertainty explicitly.
+- Focus on root-cause debugging and concrete next validation steps.
+
+Analysis objectives:
+1) error_summary: precise failure synopsis tied to exception + likely failing boundary.
+2) possible_causes: evidence-backed root-cause candidates.
+3) certainty_level: LOW|MEDIUM|HIGH based on evidence quality.
+4) severity + blast_radius: practical impact scope.
+5) likely_fix_locations: include file paths + line ranges, plus reason and evidence frame IDs.
+6) evidence: list concrete proof points citing frame IDs.
+7) first_actions_30m + verification_steps + unknowns.
+8) suggested_fix: concise initial remediation path.
+
+Output policy:
+- Every claim must be grounded in evidence.
+- Every likely_fix_locations item must include at least one concrete path:line range.
+- Keep output detailed, technical, and implementation-oriented.
+
+Crash context:
+- Function wrapper: process_data
+- Exception: TypeError: can only concatenate str (not 'int') to str
+- Traceback lines provided: 3/3
+- Query attempt: 1/1
+
+Relevant frame hints:
+- F1 | <stdin>:70 | main | code=
+
+Logging signals:
+- none detected
+
+Local source snippets around failing frames:
+- no readable local source snippets found for traceback frames
+
+
+Traceback payload:
+'''python
+Traceback (most recent call last):
+  File "<stdin>", line 70, in main
+TypeError: can only concatenate str (not 'int') to str
+'''
+
+```
+
+Local AI forensic triage:
+- error_summary: Integer/string type mismatch during arithmetic in process_data
+- certainty_level: HIGH
+- severity: MEDIUM
+- blast_radius: Isolated to request path that forwards string payloads into process_data
+- possible_causes: ["data_payload['value'] is a string at runtime (frame F1)", 'Input parsing path skipped numeric normalization before add operation']
+- likely_fix_locations: ['use_cases/09_enhanced_debugging/example.py:18-19 | cast payload value before +10 | evidence=F1']
+- evidence: ["F1 shows TypeError at arithmetic expression data_payload['value'] + 10", 'Exception text confirms str/int concatenation path']
+- first_actions_30m: ["Reproduce with failing payload {'value': '100'} and confirm exception path", 'Patch value normalization and rerun minimal repro']
+- verification_steps: ['Run use_cases/09_enhanced_debugging/example.py and confirm no TypeError', 'Add unit test covering str and int payload variants']
+- unknowns: ['Upstream callers that may rely on string payload behavior']
+- suggested_fix: Normalize data_payload['value'] to int before arithmetic and add type guard logging.
+
+Agent handoff plan:
+- objective: Patch root cause, preserve behavior, and verify regression safety.
+- prioritized_steps: ['Inspect failing frame and payload typing assumptions', 'Implement explicit int conversion + validation', 'Add focused regression tests for payload typing']
+- candidate_edits: ['use_cases/09_enhanced_debugging/example.py:18-19 | normalize value before arithmetic']
+- instrumentation: ['use_cases/09_enhanced_debugging/example.py:18 | log incoming value type before conversion']
+- verification_commands: ['python use_cases/09_enhanced_debugging/example.py', 'uv run pytest tests/test_debugging.py -q']
+- risks: ['Type coercion may mask invalid payloads if validation is too permissive']
+
+Agent handoff prompt:
+Investigate the listed frame/file, implement strict value normalization, and validate with the provided verification commands.

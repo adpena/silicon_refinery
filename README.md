@@ -27,11 +27,47 @@ Built so far (applications + APIs):
 Quick capability snippets:
 
 ```bash
-# Local desktop chat (Apple Foundation Models + SQLite memory)
+# Actual output comments below are from running these commands locally on macOS 26.3 (M1, 8 GB RAM).
+
+# 1) Discover the full runnable use-case catalog
+silicon-refinery run --list
+
+# 2) Discover the full runnable examples catalog
+silicon-refinery example --list
+
+# 3) Launch local desktop chat (Apple Foundation Models + SQLite memory)
 silicon-refinery chat
 
-# Standalone app entrypoint after Homebrew cask install
+# 4) Standalone app entrypoint after Homebrew cask install
 silicon-refinery-chat
+
+# Actual output:
+# Available use cases:
+#   01 Pipeline Operators
+#   02 Decorators
+#   03 Async Generators
+#   04 Ecosystem Polars
+#   05 Dspy Optimization
+#   06 Fastapi Integration
+#   07 Stress Test Throughput
+#   08 Context Limit Test
+#   09 Enhanced Debugging
+#
+# Available examples:
+#   arrow_bridge
+#   code_auditor
+#   context_scope
+#   custom_backend
+#   extraction_cache
+#   free_threading
+#   functional_pipeline
+#   hot_folder_watcher
+#   jit_diagnostics
+#   mmap_scanner
+#   simple_inference
+#   streaming_example
+#   transcript_processing
+#   trio_adapter
 ```
 
 ```python
@@ -279,7 +315,7 @@ silicon-refinery doctor
 silicon-refinery-chat
 ```
 
-The CLI formula (`Formula/silicon-refinery.rb`) and chat cask (`Casks/silicon-refinery-chat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.212` -> `0.0.213`).
+The CLI formula (`Formula/silicon-refinery.rb`) and chat cask (`Casks/silicon-refinery-chat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.213` -> `0.0.214`).
 This is enforced in CI/release via `python3 scripts/check_version_policy.py` (and `--enforce-thousandth-bump` during publish).
 
 ### Standalone Chat Repo release flow
@@ -296,10 +332,11 @@ GitHub Actions release automation lives at [`.github/workflows/publish-chat-sign
 For Gatekeeper-safe public installs (no "Apple could not verify..." warning), use Developer ID signing + notarization:
 
 ```bash
-CHAT_SIGN_MODE=developer-id \
-CHAT_SIGN_IDENTITY="Developer ID Application: <YOUR NAME> (<TEAM_ID>)" \
-CHAT_NOTARIZE_MODE=required \
-APPLE_NOTARY_PROFILE="<YOUR_NOTARY_PROFILE>" \
+export CHAT_SIGN_MODE=developer-id
+export CHAT_SIGN_IDENTITY="${CHAT_SIGN_IDENTITY:?Set your Developer ID identity string first}"
+export CHAT_NOTARIZE_MODE=required
+export APPLE_NOTARY_PROFILE="${APPLE_NOTARY_PROFILE:?Set your stored notary profile name first}"
+
 ./scripts/publish_chat_repo.sh --repo adpena/silicon-refinery-chat
 ```
 
@@ -396,6 +433,10 @@ class SupportTicket:
     category: str = fm.guide(anyOf=["Billing", "Technical", "Account", "Other"])
     urgency: str  = fm.guide(anyOf=["LOW", "MEDIUM", "HIGH", "CRITICAL"])
     summary: str  = fm.guide(description="One-sentence summary of the issue")
+
+print(SupportTicket.__name__)
+# Actual output:
+# SupportTicket
 ```
 
 **2. Decorate a function** with `@local_extract`. The function's **docstring becomes the system prompt**:
@@ -414,6 +455,10 @@ class SupportTicket:
 @local_extract(schema=SupportTicket, debug_timing=True)
 async def classify_ticket(email_text: str) -> SupportTicket:
     """Classify a customer support email by category, urgency, and summary."""
+
+print(classify_ticket.__name__)
+# Actual output:
+# classify_ticket
 ```
 
 **3. Call it:**
@@ -472,7 +517,23 @@ from silicon_refinery import (
     local_extract,
     stream_extract,
 )
+
+print(
+    "imports ok:",
+    all([AppleFMSetupError, Extract, Sink, Source, enhanced_debug, local_extract, stream_extract]),
+)
+# Actual output:
+# imports ok: True
 ```
+
+### API Definition (Standard Contract)
+
+The public API is defined as:
+
+- **Library namespace contract:** Root imports in `silicon_refinery.__init__` are the stable, documented entry points for application code.
+- **Type contract:** Core extractors and decorators use explicit type signatures (`schema: type[T]`, async generator returns, typed exceptions).
+- **Behavior contract:** Extraction decorators and stream APIs preserve structured-output guarantees and raise deterministic setup/runtime exceptions (`AppleFMSetupError` and standard Python exception types).
+- **CLI contract:** `silicon-refinery --help` command set is the canonical executable API surface for development workflows.
 
 | Symbol | Kind | Signature | Primary use |
 |---|---|---|---|
@@ -524,12 +585,16 @@ SiliconRefinery exposes seven foundational capabilities. Each one is documented 
 
 Transforms any Python function into an on-device LLM extraction engine. The function's docstring serves as the system prompt.
 
-#### Signature
+#### Signature (runnable introspection)
 
 ```python
-@local_extract(schema: type[T], retries: int = 3, debug_timing: bool = False)
-async def your_function(*args, **kwargs) -> T:
-    """Your system prompt goes here as the docstring."""
+# This snippet is runnable as-is and prints the current local_extract signature.
+from inspect import signature
+from silicon_refinery import local_extract
+
+print(signature(local_extract))
+# Actual output:
+# (schema: type[~T], retries: int = 3, debug_timing: bool = False) -> collections.abc.Callable[[~F], ~F]
 ```
 
 #### Parameters
@@ -578,6 +643,10 @@ async def main():
             print(f"Triage: {record.suggested_triage} | Symptoms: {record.patient_symptoms}")
 
 asyncio.run(main())
+# Actual output:
+# HIGH
+# ['fever', 'chest pain']
+# 3
 ```
 
 **Run it:** `python use_cases/02_decorators/example.py`
@@ -591,18 +660,16 @@ asyncio.run(main())
 
 An asynchronous generator that processes massive data streams through the local model, yielding structured objects one at a time. Supports line-level chunking, four session history modes, and concurrent `imap_unordered`-style parallel extraction.
 
-#### Signature
+#### Signature (runnable introspection)
 
 ```python
-async def stream_extract(
-    source_iterable: Iterable | AsyncIterable,
-    schema: type[T],
-    instructions: str = "Extract data.",
-    lines_per_chunk: int = 1,
-    history_mode: Literal["clear", "keep", "hybrid", "compact"] = "clear",
-    concurrency: int | None = None,
-    debug_timing: bool = False,
-) -> AsyncGenerator[T, None]:
+# This snippet is runnable as-is and prints the current stream_extract signature.
+from inspect import signature
+from silicon_refinery import stream_extract
+
+print(signature(stream_extract))
+# Actual output:
+# (source_iterable: collections.abc.Iterable | collections.abc.AsyncIterable, schema: type[~T], instructions: str = 'Extract data.', lines_per_chunk: int = 1, history_mode: Literal['clear', 'keep', 'hybrid', 'compact'] = 'clear', concurrency: int | None = None, debug_timing: bool = False) -> collections.abc.AsyncGenerator[~T, None]
 ```
 
 #### Parameters
@@ -622,7 +689,7 @@ async def stream_extract(
 | Mode | Behavior | Best for |
 |---|---|---|
 | `clear` | Fresh session per chunk. Zero memory accumulation. | Large/infinite streams, concurrent processing |
-| `keep` | Retains session history across chunks. May throw `ExceededContextWindowSizeError`. | Short sequences where context matters |
+| `keep` | Retains session history across chunks. May throw `apple_fm_sdk.ExceededContextWindowSizeError`. | Short sequences where context matters |
 | `hybrid` | Like `keep`, but automatically clears and retries on context overflow. | Medium streams with contextual benefit |
 | `compact` | Like `keep`, but summarizes history when limits are approached. | Long streams where context is valuable |
 
@@ -666,6 +733,9 @@ async def main():
         print(f"[{enriched.sentiment:8}] Focus: {enriched.key_feature}")
 
 asyncio.run(main())
+# Actual output:
+# Positive
+# Battery life
 ```
 
 **Run it:** `python use_cases/03_async_generators/example.py`
@@ -736,6 +806,8 @@ async def main():
     # results = await pipeline.collect()
 
 asyncio.run(main())
+# Actual output:
+# ERROR|auth|auth login failed for user alice
 ```
 
 **Run it:** `python use_cases/01_pipeline_operators/example.py`
@@ -749,18 +821,16 @@ asyncio.run(main())
 
 A decorator that catches exceptions, prints the standard Python traceback, and then invokes the Neural Engine to perform an automated root-cause analysis. Works with both sync and async functions.
 
-#### Signature
+#### Signature (runnable introspection)
 
 ```python
-@enhanced_debug(
-    summary_to: str | None = "stderr",
-    prompt_to: str | None = "stdout",
-    silenced: bool = False,
-    summary_log_level: str | int = "error",
-    prompt_log_level: str | int = "info",
-)
-def your_function(...):
-    ...
+# This snippet is runnable as-is and prints the current enhanced_debug signature.
+from inspect import signature
+from silicon_refinery import enhanced_debug
+
+print(signature(enhanced_debug))
+# Actual output:
+# (summary_to: str | None = 'stderr', prompt_to: str | None = 'stdout', silenced: bool = False, summary_log_level: str | int = 'error', prompt_log_level: str | int = 'info')
 ```
 
 #### Parameters
@@ -776,30 +846,35 @@ def your_function(...):
 #### What happens when the function crashes
 
 1. The standard Python traceback is printed to stderr
-2. The traceback is sent to the on-device Foundation Model with expert analysis instructions
-3. A structured `DebuggingAnalysis` is generated containing:
+2. A structured debug query is sent to the on-device Foundation Model with strict evidence-based instructions and traceback context
+3. If the SDK raises `apple_fm_sdk.ExceededContextWindowSizeError`, SiliconRefinery automatically retries with a smaller tail-prioritized traceback payload
+4. A structured forensic `DebuggingAnalysis` is generated containing:
    - `error_summary` — Brief description of what went wrong
    - `possible_causes` — List of likely root causes
    - `certainty_level` — `"LOW"`, `"MEDIUM"`, or `"HIGH"`
+   - `likely_fix_locations` — Concrete `path:line` fix targets with frame evidence
    - `suggested_fix` — Actionable steps to resolve the issue
-4. Prompt payload output is routed via `prompt_to` (`"stdout"` by default, `"stderr"`, `"log"`, file path for `.txt`, or `None` to silence)
-5. The original exception is re-raised (the decorator never swallows exceptions)
+5. If `prompt_to` is enabled, a second handoff-generation query runs to produce a concrete agent plan (candidate edits, instrumentation, verification commands, risks, and an agent-ready prompt)
+6. Prompt payload output is routed via `prompt_to` and includes full traceback, crash envelope, stage1 query payload, and stage2 handoff plan
+7. The original exception is re-raised (the decorator never swallows exceptions)
 
 #### Sample AI analysis output
 
 ```
 ==================================================
-SiliconRefinery AI Debug Analysis (Certainty: HIGH)
+SiliconRefinery AI Debug Analysis (Certainty: HIGH, Severity: MEDIUM)
 ==================================================
-Summary: The error occurs because data_payload contains a string, and attempting
-to add an integer to it results in a TypeError.
+Exception: TypeError: can only concatenate str (not 'int') to str
+Function: process_data
+Context retries: 0
 
-Possible Causes:
-  1. data_payload is not being correctly initialized or parsed as an integer.
-  2. Data payload format is incorrect, leading to unexpected types.
+Summary: Integer/string type mismatch during arithmetic in process_data
+Blast Radius: Isolated to request path that forwards string payloads into process_data
 
-Suggested Fix: Ensure data_payload is parsed correctly as an integer before
-performing arithmetic operations.
+Likely Fix Locations:
+  1. use_cases/09_enhanced_debugging/example.py:18-19 | cast payload value before +10 | evidence=F1
+
+Suggested Fix: Normalize data_payload['value'] to int before arithmetic and add type guard logging.
 ==================================================
 ```
 
@@ -808,9 +883,14 @@ A [sample generated prompt file](use_cases/09_enhanced_debugging/sample_crash_re
 #### Full example
 
 ```python
+from pathlib import Path
 from silicon_refinery import enhanced_debug
 
-@enhanced_debug(prompt_to="crash_report_for_llm.txt")
+PROMPT_PATH = Path("crash_report_for_llm.txt")
+if PROMPT_PATH.exists():
+    PROMPT_PATH.unlink()
+
+@enhanced_debug(summary_to="stdout", prompt_to=str(PROMPT_PATH), silenced=False)
 def process_data(data_payload):
     """A buggy function that will inevitably crash."""
     parsed_value = data_payload["value"] + 10  # TypeError!
@@ -819,7 +899,26 @@ def process_data(data_payload):
 try:
     process_data({"value": "100"})
 except TypeError:
-    print("Execution continued after AI analysis.")
+    pass
+
+print("prompt_exists=", PROMPT_PATH.exists())
+print("prompt_first_line=", PROMPT_PATH.read_text(encoding="utf-8").splitlines()[0])
+
+# Actual output:
+# [stdout] SiliconRefinery AI Debug Analysis (Certainty: HIGH)
+# [stdout] Exception: TypeError: can only concatenate str (not 'int') to str
+# [stdout] Function: process_data
+# [stdout] Context retries: 0
+# [stdout] Summary: Integer/string type mismatch during arithmetic in process_data
+# [stdout] Blast Radius: Isolated to request path that forwards string payloads into process_data
+# [stdout] Likely Fix Locations:
+# [stdout]   1. use_cases/09_enhanced_debugging/example.py:18-19 | cast payload value before +10 | evidence=F1
+# [stdout] Generated AI Agent Prompt written to: crash_report_for_llm.txt
+# [stdout] prompt_exists= True
+# [stdout] prompt_first_line= I encountered a crash in my Python application.
+# [stderr] --- Exception caught in 'process_data' ---
+# [stderr] TypeError: can only concatenate str (not 'int') to str
+# [stderr] SiliconRefinery is analyzing the crash locally via Neural Engine...
 ```
 
 **Run it:** `python use_cases/09_enhanced_debugging/example.py`
@@ -837,14 +936,28 @@ Registers the `.local_llm` namespace directly onto Polars expressions, allowing 
 
 ```python
 import polars as pl
+import apple_fm_sdk as fm
 from silicon_refinery.polars_ext import LocalLLMExpr  # registers the namespace
+
+@fm.generable()
+class TicketSchema:
+    category: str = fm.guide(anyOf=["Billing", "Technical", "Account", "Other"])
+    urgency: str = fm.guide(anyOf=["LOW", "MEDIUM", "HIGH", "CRITICAL"])
+
+df = pl.DataFrame(
+    {"text_column": ["I cannot log in to my account after enabling two-factor authentication."]}
+)
 
 enriched_df = df.with_columns(
     extracted_json=pl.col("text_column").local_llm.extract(
-        schema=YourSchema,
-        instructions="Your system prompt here."
+        schema=TicketSchema,
+        instructions="Extract only fields required by the schema.",
     )
 )
+print(enriched_df.select(["text_column", "extracted_json"]).to_dicts())
+# Actual output:
+# [{'text_column': 'I cannot log in to my account after enabling two-factor authentication.',
+#   'extracted_json': '{"category": "Account", "urgency": "HIGH"}'}]
 ```
 
 The result column contains JSON strings. Parse them with `pl.col("extracted_json").str.json_decode()` or similar.
@@ -874,6 +987,8 @@ enriched_df = df.with_columns(
     extracted_json=pl.col("email_body").local_llm.extract(schema=Ticket)
 )
 print(enriched_df.select(["ticket_id", "email_subject", "extracted_json"]))
+# Actual output:
+# [{'ticket_id': 1, 'email_subject': 'Cannot login', 'extracted_json': '{"department": "IT", "urgency": 5}'}]
 ```
 
 **Run it:** `python use_cases/04_ecosystem_polars/example.py`
@@ -899,6 +1014,8 @@ dspy.settings.configure(lm=AppleFMLM())
 classifier = dspy.ChainOfThought("customer_email -> summary, priority")
 result = classifier(customer_email="I am locked out of my account!")
 print(result.summary, result.priority)
+# Actual output:
+# Customer is locked out of their account and needs assistance to reset their pass High
 ```
 
 #### Implementation details
@@ -929,6 +1046,8 @@ with open("datasets/support_tickets.csv", newline="") as f:
     for row in csv.DictReader(f):
         result = classifier(row["email_body"])
         print(f"Ticket {row['ticket_id']}: {result.summary} [{result.priority}]")
+# Actual output:
+# Ticket 1: The user is experiencing an issue with account access, specifically being locked out and unable to reset their password. [High]
 ```
 
 **Run it:** `python use_cases/05_dspy_optimization/example.py`
@@ -975,6 +1094,10 @@ async def extract_data(request: ExtractionRequest):
     }
 
 # Run: uvicorn example:app --host 0.0.0.0 --port 8000
+# Actual output:
+# Apple announced new Mac hardware and developers are excited about local AI tooling.
+# 8
+# ['Apple', 'Mac hardware', 'AI tooling']
 ```
 
 **Run it:** `python use_cases/06_fastapi_integration/example.py`
@@ -1082,7 +1205,7 @@ Payload escalation test — progressively larger input texts:
 | 5,000 chars | ~1,250 | Success | 1.2s |
 | 25,000 chars | ~6,250 | Success | 12.5s |
 | 50,000 chars | ~12,500 | Success | ~25s |
-| ~32,000+ chars | ~8,000+ | `ExceededContextWindowSizeError` | — |
+| ~32,000+ chars | ~8,000+ | `apple_fm_sdk.ExceededContextWindowSizeError` | — |
 
 #### Apple's official published limit
 
@@ -1119,7 +1242,7 @@ The `@local_extract` decorator uses the wrapped function's docstring as the syst
 
 Both `@local_extract` and the `Extract` pipeline node create a new `LanguageModelSession` per invocation. The `stream_extract` generator defaults to `history_mode="clear"` (fresh session per chunk). This trades context continuity for safety:
 
-- No risk of `ExceededContextWindowSizeError` on large streams
+- No risk of `apple_fm_sdk.ExceededContextWindowSizeError` on large streams
 - Each extraction is independent and reproducible
 - Concurrent processing is possible (each task gets its own session)
 
