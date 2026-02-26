@@ -1,0 +1,40 @@
+name: Publish Standalone Chat Repo
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-chat-repo:
+    name: Sync + publish silicon-refinery-chat
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Validate required secret
+        env:
+          CHAT_REPO_GH_TOKEN: ${{ secrets.CHAT_REPO_GH_TOKEN }}
+        run: |
+          if [ -z "${CHAT_REPO_GH_TOKEN}" ]; then
+            echo "CHAT_REPO_GH_TOKEN secret is required for cross-repository publish." >&2
+            exit 1
+          fi
+
+      - name: Publish standalone chat repo
+        env:
+          GH_TOKEN: ${{ secrets.CHAT_REPO_GH_TOKEN }}
+          CHAT_REPO: adpena/silicon-refinery-chat
+          CHAT_APP_NAME: SiliconRefineryChat
+          CHAT_REPO_DESCRIPTION: Standalone macOS app for SiliconRefineryChat (Toga + Briefcase).
+          CHAT_RELEASE_TAG: ${{ github.ref_name }}
+        run: ./scripts/publish_chat_repo.sh
