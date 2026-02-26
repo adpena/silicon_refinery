@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import importlib
 import json
 import logging
 import sys
@@ -286,7 +287,7 @@ class TrioAdapter:
 
         trio_end_of_channel: type[BaseException] | None = None
         try:
-            import trio
+            trio = importlib.import_module("trio")
 
             trio_end_of_channel = getattr(trio, "EndOfChannel", None)
         except ImportError:

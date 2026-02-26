@@ -1,15 +1,16 @@
 import asyncio
 import concurrent.futures
 import functools
+import importlib
 import inspect
 import logging
 import sys
 import traceback
 
-import apple_fm_sdk as fm
-
 from .exceptions import AppleFMSetupError, ensure_model_available
 from .protocols import create_model, create_session
+
+fm = importlib.import_module("apple_fm_sdk")
 
 logger = logging.getLogger("silicon_refinery.debug")
 _SYNC_ANALYSIS_TIMEOUT_SECONDS = 30
