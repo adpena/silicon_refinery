@@ -12,6 +12,7 @@ A demo desktop app for Apple Foundation Models that runs fully local and is desi
 - Automatic steering interjection: interrupt in-flight generation, inject the steering update into history, and rerun
 - Codex-style rolling compaction for long conversations
 - Familiar slash commands: `/help`, `/new`, `/clear`, `/export`
+- Hardened send interaction: `Cmd+Enter` sends, `Enter` keeps newline behavior in compose
 
 ## Quickstart
 

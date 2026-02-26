@@ -200,7 +200,7 @@ silicon-refinery doctor
 silicon-refinery-chat
 ```
 
-The CLI formula (`Formula/silicon-refinery.rb`) and chat cask (`Casks/silicon-refinery-chat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.209` -> `0.0.210`).
+The CLI formula (`Formula/silicon-refinery.rb`) and chat cask (`Casks/silicon-refinery-chat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.210` -> `0.0.211`).
 This is enforced in CI/release via `python3 scripts/check_version_policy.py` (and `--enforce-thousandth-bump` during publish).
 
 ### Standalone Chat Repo release flow
@@ -275,6 +275,8 @@ silicon-refinery notebook   # Launch the comprehensive marimo notebook
 silicon-refinery chat       # Run the Toga + Briefcase local chat demo
 silicon-refinery chat --standard-gil  # Force standard-gil runtime for max GUI stability
 ```
+
+In chat compose, use `Cmd+Enter` to send; plain `Enter` inserts a newline.
 
 ### Verify your installation
 
