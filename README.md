@@ -10,7 +10,12 @@
   </p>
 </div>
 
-**SiliconRefinery** is an enterprise-grade Python framework built on the [Apple Foundation Models SDK (`python-apple-fm-sdk`)](https://github.com/apple/python-apple-fm-sdk). It transforms your Apple Silicon machine into a private, high-throughput data extraction node — processing unstructured text into guaranteed-schema objects without ever sending a single byte to the cloud.
+**SiliconRefinery** is a Python framework built on the [Apple Foundation Models SDK (`python-apple-fm-sdk`)](https://github.com/apple/python-apple-fm-sdk). It transforms your Apple Silicon machine into a private, high-throughput data extraction node — processing unstructured text into guaranteed-schema objects without ever sending a single byte to the cloud.
+
+It is designed for both large-scale teams and individual local developers:
+- building privacy-preserving data workflows on macOS
+- prototyping and shipping local-first Mac applications
+- integrating on-device AI into development tooling and product features
 
 ```python
 from silicon_refinery import local_extract
@@ -54,7 +59,7 @@ No API keys. No cloud calls. No token costs. Everything runs on the Neural Engin
 
 ## Why SiliconRefinery?
 
-Enterprises sit on petabytes of "dark data" — unstructured logs, CSV dumps, support emails, medical records. Processing this data intelligently has historically meant sending it to cloud LLM providers, incurring massive token costs and compliance nightmares (GDPR, HIPAA, SOC 2).
+Organizations and local developers alike sit on "dark data" — unstructured logs, CSV dumps, notes, support emails, and app traces. Processing this data intelligently has historically meant sending it to cloud LLM providers, incurring token costs and privacy/compliance risks.
 
 SiliconRefinery flips the paradigm:
 
@@ -66,6 +71,7 @@ SiliconRefinery flips the paradigm:
 | **Async complexity** | Idiomatic `asyncio` patterns — decorators, generators, pipelines — all async-native. |
 | **Context window explosion** | Built-in session management: clear, keep, hybrid, and compact history modes. |
 | **No DataFrame integration** | First-class Polars extension via `.local_llm.extract()`. |
+| **Small OSS LLMs can still be heavy, memory-hungry, architecture-mismatched, and hard to trust/observe** | Uses Apple’s highly optimized Foundation Models stack with tight local integration on Apple Silicon for stronger performance, provenance, and security within the on-device ecosystem. |
 
 **Measured throughput:** 250-350+ characters/sec (~60-90 tokens/sec) on Apple M1, purely on-device. See [Benchmarks](#benchmarks--empirical-results).
 
@@ -78,6 +84,31 @@ SiliconRefinery flips the paradigm:
 - macOS 26.0+ (Tahoe or later)
 - Apple Silicon (M1, M2, M3, M4 series)
 - CPython 3.13+
+
+### Fastest install paths (PyPI + Homebrew)
+
+For the simplest setup UX/DX, pick one:
+
+```bash
+# 1) PyPI (library + CLI in a virtual environment)
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U silicon-refinery
+pip install -U "apple-fm-sdk @ git+https://github.com/apple/python-apple-fm-sdk.git"
+
+# Verify
+silicon-refinery doctor
+```
+
+```bash
+# 2) Homebrew (CLI + standalone desktop app)
+brew tap adpena/silicon-refinery https://github.com/adpena/homebrew-silicon-refinery
+brew install --HEAD adpena/silicon-refinery/silicon-refinery
+brew install --cask adpena/silicon-refinery/silicon-refinery-chat
+
+# Verify
+silicon-refinery doctor
+```
 
 ### One-command setup (recommended)
 
@@ -143,8 +174,9 @@ uv sync --project examples/toga_local_chat_app --directory examples/toga_local_c
 
 ### PyPI and Homebrew install story
 
-- **PyPI:** `silicon-refinery` publishes package metadata and the CLI entry point, but full on-device runtime support still depends on `apple-fm-sdk` (currently pulled from GitHub, not PyPI).
-- **Recommended install path today:** clone this repo and run `./scripts/setup.sh` (or `uv sync --all-groups`) so the Apple SDK source dependency is resolved correctly.
+- **PyPI:** `silicon-refinery` is published on PyPI for both Python imports and CLI usage.
+- **Apple FM SDK dependency:** install `apple-fm-sdk` from GitHub (`pip install "apple-fm-sdk @ git+https://github.com/apple/python-apple-fm-sdk.git"`), because upstream is still GitHub-sourced.
+- **Best automation path for local development:** clone this repo and run `./scripts/setup.sh` (or `uv sync --all-groups`) to bootstrap everything in one flow.
 - **Homebrew tap:** `adpena/homebrew-silicon-refinery`
 
 ```bash
