@@ -1,7 +1,7 @@
 class Fmtools < Formula
   desc "Async-native Python framework for Apple Foundation Models"
   homepage "https://github.com/adpena/fmtools"
-  url "https://github.com/adpena/fmtools/archive/refs/tags/v0.0.217.tar.gz"
+  url "https://github.com/adpena/fmtools/archive/refs/tags/v0.0.218.tar.gz"
   sha256 "04dc5d79bdc9b47f12e1c09ff5b8514045a4a4760657415cb923bc5524eaeb88"
   license "MIT"
   head "https://github.com/adpena/fmtools.git", branch: "main"

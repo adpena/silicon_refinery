@@ -1,5 +1,5 @@
 cask "fmchat" do
-  version "0.0.217"
+  version "0.0.218"
   sha256 "47307f78fe3971f7918ae49f5aa69d653acaefe868fff43287d448a17bb4db29"
 
   url "https://github.com/adpena/fmchat/releases/download/v#{version}/FMChat-#{version}.dmg"

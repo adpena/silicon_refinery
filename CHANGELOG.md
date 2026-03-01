@@ -5,7 +5,7 @@ All notable changes to FMTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions increment by patch (0.0.205 → 0.0.206 → 0.0.207 → 0.0.208 ...).
 
-## [0.0.217] - 2026-02-26
+## [0.0.218] - 2026-02-26
 
 Final Toga chat layout and transcript UX hardening for release.
 

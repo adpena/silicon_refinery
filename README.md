@@ -315,7 +315,7 @@ fmtools doctor
 fmchat
 ```
 
-The CLI formula (`Formula/fmtools.rb`) and chat cask (`Casks/fmchat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.216` -> `0.0.217`).
+The CLI formula (`Formula/fmtools.rb`) and chat cask (`Casks/fmchat.rb`) are version-locked to the same release number and use thousandth-place increments (`0.0.216` -> `0.0.218`).
 This is enforced in CI/release via `python3 scripts/check_version_policy.py` (and `--enforce-thousandth-bump` during publish).
 
 ### Standalone Chat Repo release flow

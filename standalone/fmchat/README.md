@@ -28,8 +28,8 @@ fmchat
 ```text
 Actual output excerpt from local run:
 
-fmchat 0.0.217 installed=0.0.217
-fmtools 0.0.217 installed=0.0.217
+fmchat 0.0.218 installed=0.0.218
+fmtools 0.0.218 installed=0.0.218
 ```
 
 This installs `FMChat.app` and a `fmchat` launcher command.
@@ -64,7 +64,7 @@ The parent publish pipeline now blocks release uploads for untrusted artifacts b
 
 ## Versioning
 
-`fmchat` stays version-locked with `fmtools` and uses thousandth-place increments (`0.0.216` -> `0.0.217`).
+`fmchat` stays version-locked with `fmtools` and uses thousandth-place increments (`0.0.216` -> `0.0.218`).
 
 ## License
 
